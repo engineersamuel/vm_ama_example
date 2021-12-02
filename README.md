@@ -78,7 +78,7 @@ WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace list -g ama_test | jq
 jq '.properties.destinations.logAnalytics[0].workspaceResourceId |= env.WORKSPACE_RESOURCE_ID | .properties.destinations.logAnalytics[0].name = env.DESTINATION_NAME | .properties.dataFlows[0].destinations |= [ env.DESTINATION_NAME ]' templates/dcr.base.json > templates/dcr.test.json
 ```
 
-Copy and paste the `New-AzDataCollectionRule ...` then the `New-AzDataCollectionRuleAssociation ...` from the previous terraform output.  If you lost the context in your terminal execute `terraform output`.
+In powershell (type `pwsh`) Copy and paste the `New-AzDataCollectionRule ...` then the `New-AzDataCollectionRuleAssociation ...` from the previous terraform output.  If you lost the context in your terminal execute `terraform output`.
 
 Note that the `DESTINATION_NAME="log-analytics-log-destination"` is static, but you could change it to be whatever you want, just ensure it matches the default value in [deployment/locals.tf](deployment/locals.tf).
 
@@ -149,7 +149,15 @@ In the [templates/dcr.test.json](./templates/dcr.test.json) an error is thrown "
   "Microsoft-Event",
 ```
 
+I've seen the Log Analytics workspace deployed to a separate subscription which causes the `az monitor` commands to fail when looking up the workspace.  This may be due to me running in an enterprise sub and not a pay-as-you-go which may be with LA requires.
+
 ### References
 
-- [https://docs.microsoft.com/en-us/azure/azure-monitor/agents/data-collection-rule-overview#create-a-dcr]
-- [https://github.com/Azure/azure-cli-extensions/blob/main/src/monitor-control-service/README.md]
+- [Azure Monitor Agent](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-overview)
+- [DCR Reference](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/data-collection-rule-overview#create-a-dcr)
+- [az monitor-control-service][https://github.com/Azure/azure-cli-extensions/blob/main/src/monitor-control-service/README.md]
+- [DCR json reference](https://docs.microsoft.com/en-us/rest/api/monitor/data-collection-rules/create#examples)
+- [*-AzDataCollection* Command Reference](https://github.com/Azure/azure-powershell/tree/main/src/Monitor/Monitor/help)
+- [Terraform Azure Github Examples](https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples)
+- [az monitor log-analytics](https://docs.microsoft.com/en-us/cli/azure/monitor/log-analytics?view=azure-cli-latest)
+- [Performance Counters reference](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/data-sources-performance-counters)

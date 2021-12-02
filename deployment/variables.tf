@@ -4,7 +4,7 @@
 variable "name" {
   description = "A unique name for the module"
   type        = string
-  default     = "iamsam"
+  default     = "samuel"
 }
 
 variable "region" {
@@ -30,3 +30,11 @@ variable "time_zone" {
   description = "Time zone for midnight VM shutdown policy"
   default     = "Pacific Standard Time"
 }
+
+/*
+variable "linux_installation_script" {
+  type        = string
+  description = "Time zone for midnight VM shutdown policy"
+  default     = "./scripts/linuxInstallation.sh"
+}
+*/

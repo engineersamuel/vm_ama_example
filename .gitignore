@@ -1,5 +1,5 @@
 # Customer
-templates/dcr.test.json
+deployment/templates/dcr.test.json
 
 # Local .terraform directories
 **/.terraform/*

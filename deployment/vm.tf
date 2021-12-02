@@ -26,14 +26,14 @@ resource "azurerm_network_interface" "vm1" {
 }
 
 resource "azurerm_public_ip" "this" {
-  name                = "samuel-linux-1-pip"
+  name                = local.vm_linux_name_pip
   resource_group_name = azurerm_resource_group.this.name
   location            = azurerm_resource_group.this.location
   allocation_method   = "Dynamic"
 }
 
 resource "azurerm_linux_virtual_machine" "vm1" {
-  name                = "samuel-linux-1"
+  name                = local.vm_linux_name
   resource_group_name = azurerm_resource_group.this.name
   location            = var.region
   size                = var.vm-size
@@ -95,7 +95,6 @@ resource "azurerm_log_analytics_workspace" "this" {
   name                = azurecaf_name.laws_name.result
   location            = azurerm_resource_group.this.location
   resource_group_name = azurerm_resource_group.this.name
-  # TODO: Consider changing to "Free"
   sku                 = "PerGB2018"
   retention_in_days   = 180
 }
@@ -119,8 +118,8 @@ resource "azurerm_dev_test_global_vm_shutdown_schedule" "vm_nightly_shutdown" {
 # ------------------------------------------------------------------------------------------------------
 # Custom linux libraries
 # ------------------------------------------------------------------------------------------------------
-resource "azurerm_virtual_machine_extension" "linux_libs" {
-  name                 = "hostname"
+resource "azurerm_virtual_machine_extension" "custom_commands" {
+  name                 = "custom_commands"
   virtual_machine_id   = azurerm_linux_virtual_machine.vm1.id
   publisher            = "Microsoft.Azure.Extensions"
   type                 = "CustomScript"
@@ -128,10 +127,26 @@ resource "azurerm_virtual_machine_extension" "linux_libs" {
 
   settings = <<SETTINGS
     {
-        "commandToExecute": "sudo apt-get -y install stress"
+        "commandToExecute": "sudo apt-get update && sudo apt-get -y install stress && sudo timedatectl set-timezone America/New_York"
     }
 SETTINGS
+
+
+  #protected_settings = <<SETTINGS
+  #  "script": "${base64encode(file(var.linux_installation_script))}"
+#SETTINGS
 }
+
+resource "azurerm_virtual_machine_extension" "ama" {
+  name = "AMALinux"
+  virtual_machine_id = azurerm_linux_virtual_machine.vm1.id
+  publisher = "Microsoft.Azure.Monitor"
+  type = "AzureMonitorLinuxAgent"
+  type_handler_version = "1.12"
+  auto_upgrade_minor_version = true
+}
+
+
 
 # ------------------------------------------------------------------------------------------------------
 # ENABLE AAD SSH in Linux VM(s)
