@@ -9,7 +9,6 @@
     - [Section 6. CLI Utils](#section-6-cli-utils)
   - [Instructions](#instructions)
     - [Terraform](#terraform)
-    - [Data Collection Rule](#data-collection-rule)
     - [SSH to VM](#ssh-to-vm)
     - [Stress test](#stress-test)
     - [View the CPU Spike](#view-the-cpu-spike)
@@ -66,22 +65,6 @@ Once applied terraform will output three commands, see the [deployment/output.tf
 
 Note that the [deployment/variables.tf](deployment/variables.tf) contains defaults for each required variable.  You still need a [deployment/dev.tfvars](./deployment/dev.tfvars) however it can be empty unless you want to override the defaults.
 
-### Data Collection Rule
-
-As of 11/2021 the `az monitor data-collection rule create` does not support using a file to configure the DCR.  It can be done with this cli command but it's very lengthy and unweildy, so I recommend using powershell for this, even if you are on MacOS or Linux, it works just as well.
-
-The `terraform apply` output will contain four powershell commands.  Two `New-*` commands for adding a rule and association, and two `Remove-*` for removing those, promarily for testing purposes.
-
-```bash
-DESTINATION_NAME="log-analytics-log-destination" \
-WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace list -g ama_test | jq -r '.[0].id') \
-jq '.properties.destinations.logAnalytics[0].workspaceResourceId |= env.WORKSPACE_RESOURCE_ID | .properties.destinations.logAnalytics[0].name = env.DESTINATION_NAME | .properties.dataFlows[0].destinations |= [ env.DESTINATION_NAME ]' templates/dcr.base.json > templates/dcr.test.json
-```
-
-In powershell (type `pwsh`) Copy and paste the `New-AzDataCollectionRule ...` then the `New-AzDataCollectionRuleAssociation ...` from the previous terraform output.  If you lost the context in your terminal execute `terraform output`.
-
-Note that the `DESTINATION_NAME="log-analytics-log-destination"` is static, but you could change it to be whatever you want, just ensure it matches the default value in [deployment/locals.tf](deployment/locals.tf).
-
 ### SSH to VM
 
 ```bash
@@ -89,7 +72,7 @@ Note that the `DESTINATION_NAME="log-analytics-log-destination"` is static, but 
 ssh -i ~/.ssh/id_rsa adminuser@vmIp
 ```
 
-To get the ip of the VM use: `az vm list-ip-addresses --name vmName --resource-group ama_test --out table`
+Note: The above ssh command is output as part of terraform output so you can copy and paste from your terminal.  Alternatively to get the ip of the VM use: `az vm list-ip-addresses --name vmName --resource-group ama_test --out table`.
 
 ### Stress test
 

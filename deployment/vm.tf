@@ -146,7 +146,163 @@ resource "azurerm_virtual_machine_extension" "ama" {
   auto_upgrade_minor_version = true
 }
 
+# resource "null_resource" "dcr" {
+#   provisioner "local-exec" {
+#     command = <<EOC
+#       New-AzDataCollectionRule -Location '${var.region}' -ResourceGroupName '${azurerm_resource_group.this.name}' -RuleName '${local.dcr_name}' -RuleFile './templates/dcr.test.json'
 
+#       az rest --subscription ${data.azurerm_client_config.current.subscription_id} \
+#               --method PUT \
+#               --url https://management.azure.com${azurerm_linux_virtual_machine.vm.id}/providers/Microsoft.Insights/dataCollectionRuleAssociations/${azurerm_linux_virtual_machine.vm.name}-dcrassociation?api-version=2019-11-01-preview \
+#               --body '{"properties":{"dataCollectionRuleId": "${var.azure_monitor_data_collection_rule_id}"}}'
+#     EOC
+#   }
+
+#   triggers = {
+#     # dcr_id = var.azure_monitor_data_collection_rule_id
+#     vm_id  = azurerm_linux_virtual_machine.vm.id
+#   }
+# }
+
+    # DESTINATION_NAME="log-analytics-log-destination" \
+    # WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace list -g ama_test | jq -r '.[0].id') \
+    # jq '.properties.destinations.logAnalytics[0].workspaceResourceId |= env.WORKSPACE_RESOURCE_ID | .properties.destinations.logAnalytics[0].name = env.DESTINATION_NAME | .properties.dataFlows[0].destinations |= [ env.DESTINATION_NAME ]' templates/dcr.base.json > templates/dcr.test.json
+# module "dcr" {
+#   source = "matti/resource/shell"
+
+#   command = <<EOC
+#     az rest --subscription ${data.azurerm_client_config.current.subscription_id} \
+#             --method PUT \
+#             --url https://management.azure.com/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm.name}-dcr?api-version=2019-11-01-preview
+#             --body '{"properties":{"dataCollectionRuleId": "${var.azure_monitor_data_collection_rule_id}"}}'
+#   EOC
+# }
+
+      # az rest --subscription "${data.azurerm_client_config.current.subscription_id}" \
+      #         --method PUT \
+      #         --url "https://management.azure.com/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm1.name}-dcr?api-version=2019-11-01-preview" \
+              # --body @{templates/dcr.test.json}
+
+# $command = 'dir "c:\program files" '
+#         $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+#         $encodedCommand = [Convert]::ToBase64String($bytes)
+#         pwsh -encodedcommand $encodedCommand
+      # New-AzDataCollectionRule -Location '${var.region}' -ResourceGroupName '${azurerm_resource_group.this.name}' -RuleName '${azurerm_linux_virtual_machine.vm1.name}-dcr' -RuleFile './templates/dcr.test.json'
+
+data "template_file" "dcr" {
+  template = file(format("%s/templates/dcr.base.json.tpl", path.module))
+
+  vars = {
+    location                      = var.region
+    log_analytics_workspace_id = azurerm_log_analytics_workspace.this.id
+    # log_analytics_workspace_id    = azurerm_log_analytics_workspace.this.workspace_id
+    log_analytics_workspace_name  = azurerm_log_analytics_workspace.this.name
+    # destination_name              = "log-analytics-log-destination"
+    destination_name              = azurerm_log_analytics_workspace.this.name
+    # syslog_facility_names      = jsonencode(var.syslog_facilities_names)
+    # syslog_levels              = jsonencode(var.syslog_levels)
+    # tags                       = jsonencode(merge(local.default_tags, var.extra_tags))
+  }
+}
+
+      # az config set auto-upgrade.prompt=no \
+      # DESTINATION_NAME="log-analytics-log-destination" \
+      # WORKSPACE_RESOURCE_ID=$(az monitor log-analytics workspace list -g ama_test | jq -r '.[0].id') \
+      # jq '.properties.destinations.logAnalytics[0].workspaceResourceId |= env.WORKSPACE_RESOURCE_ID | .properties.destinations.logAnalytics[0].name = env.DESTINATION_NAME | .properties.dataFlows[0].destinations |= [ env.DESTINATION_NAME ]' templates/dcr.base.json > templates/dcr.test.json \
+
+
+      # $command = 'New-AzDataCollectionRule -Location "${var.region}" -ResourceGroupName "${azurerm_resource_group.this.name}" -RuleName "${azurerm_linux_virtual_machine.vm1.name}-dcr" -RuleFile "./templates/dcr.test.json"'
+      # $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+      # $encodedCommand = [Convert]::ToBase64String($bytes)
+      # pwsh -encodedcommand $encodedCommand
+
+# TODO: Do we need to set the auto-upgrade prompt to no somewhere?  If not I've seen the az cli sit there and wait for user input
+# az config set auto-upgrade.prompt=no \
+resource "null_resource" "dcr" {
+  provisioner "local-exec" {
+    command = <<EOC
+      az rest --subscription "${data.azurerm_client_config.current.subscription_id}" \
+        --method PUT \
+        --url "https://management.azure.com/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm1.name}-dcr?api-version=2019-11-01-preview" \
+        --body '${data.template_file.dcr.rendered}'
+    EOC
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<EOC
+      az rest --subscription "${self.triggers.sub_id}" \
+        --method DELETE \
+        --url "https://management.azure.com/subscriptions/${self.triggers.sub_id}/resourceGroups/${self.triggers.rg}/providers/Microsoft.Insights/dataCollectionRules/${self.triggers.dcr_name}?api-version=2019-11-01-preview" \
+        --body '{"properties":{"dataCollectionRuleId": "${self.triggers.dcr_name}"}}'
+    EOC
+    on_failure = continue
+  }
+
+  triggers = {
+    # Consider a hash check here on the template itself.
+    # dcr_id = var.azure_monitor_data_collection_rule_id
+    vm_id  = azurerm_linux_virtual_machine.vm1.id,
+    sub_id  = data.azurerm_client_config.current.subscription_id,
+    rg  = azurerm_resource_group.this.name,
+    dcr_name = "${azurerm_linux_virtual_machine.vm1.name}-dcr"
+    data = md5(data.template_file.dcr.rendered)
+  }
+
+  depends_on = [
+    azurerm_virtual_machine_extension.ama
+  ]
+}
+
+
+              # --url "https://management.azure.com${azurerm_linux_virtual_machine.vm1.id}/providers/Microsoft.Insights/dataCollectionRuleAssociations/${azurerm_linux_virtual_machine.vm1.name}-dcra?api-version=2019-11-01-preview" \
+      # New-AzDataCollectionRuleAssociation -TargetResourceId '${azurerm_linux_virtual_machine.vm1.id}' -AssociationName '${azurerm_linux_virtual_machine.vm1.name}-dcra' -RuleId '/subscriptions/${local.sub_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm1.name}-dcr'
+
+
+      # az monitor data-collection rule association create --name "${azurerm_linux_virtual_machine.vm1.name}-dcra"
+      #  --resource "${azurerm_linux_virtual_machine.vm1.id}"
+      #  [--description]
+      #  [--rule-id]
+
+      # Ex resource id: "subscriptions/703362b3-f278-4e4b-9179-c76eaf41ffc2/resourceGroups/myResourceGroup/providers/Microsoft.Compute/virtualMachines/myVm"
+
+# NOTE: Destroy won't work if the VM is stopped, it will error that it can't remove the DCRA if the VM is not running
+resource "null_resource" "dcra" {
+
+  provisioner "local-exec" {
+    command = <<EOC
+
+      az rest --subscription "${data.azurerm_client_config.current.subscription_id}" \
+              --method PUT \
+              --url "https://management.azure.com/${azurerm_linux_virtual_machine.vm1.id}/providers/Microsoft.Insights/dataCollectionRuleAssociations/${azurerm_linux_virtual_machine.vm1.name}-dcra?api-version=2019-11-01-preview" \
+              --body '{"properties":{"dataCollectionRuleId": "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm1.name}-dcr"}}'
+    EOC
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<EOC
+      az rest --subscription "${self.triggers.sub_id}" \
+        --method DELETE \
+        --url "https://management.azure.com/${self.triggers.vm_id}/providers/Microsoft.Insights/dataCollectionRuleAssociations/${self.triggers.dcra_name}?api-version=2019-11-01-preview" \
+        --body '{"properties":{"dataCollectionRuleId": "${self.triggers.dcr_id}"}}'
+    EOC
+    on_failure = continue
+  }
+
+  triggers = {
+    # vm_name  = azurerm_linux_virtual_machine.vm1.name,
+    vm_id  = azurerm_linux_virtual_machine.vm1.id,
+    sub_id  = data.azurerm_client_config.current.subscription_id,
+    rg  = azurerm_resource_group.this.name,
+    dcra_name = "${azurerm_linux_virtual_machine.vm1.name}-dcra",
+    dcr_id = "/subscriptions/${data.azurerm_client_config.current.subscription_id}/resourceGroups/${azurerm_resource_group.this.name}/providers/Microsoft.Insights/dataCollectionRules/${azurerm_linux_virtual_machine.vm1.name}-dcr"
+  }
+
+  depends_on = [
+    null_resource.dcr
+  ]
+}
 
 # ------------------------------------------------------------------------------------------------------
 # ENABLE AAD SSH in Linux VM(s)
