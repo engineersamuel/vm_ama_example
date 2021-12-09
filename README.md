@@ -3,12 +3,11 @@
 - [Introduction](#introduction)
   - [Prerequisites](#prerequisites)
     - [Azure CLI](#azure-cli)
-    - [Section 2. Terraform](#section-2-terraform)
+    - [Terraform](#terraform)
     - [Azure CLI Extensions](#azure-cli-extensions)
     - [Azure Monitor Powershell](#azure-monitor-powershell)
-    - [Section 6. CLI Utils](#section-6-cli-utils)
   - [Instructions](#instructions)
-    - [Terraform](#terraform)
+    - [Terraform](#terraform-1)
     - [SSH to VM](#ssh-to-vm)
     - [Stress test](#stress-test)
     - [View the CPU Spike](#view-the-cpu-spike)
@@ -23,9 +22,9 @@ If on Windows 10 it's recommended to use WSL2 + Ubuntu.
 ### Azure CLI
 
 - [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-- [Install Azure CLI ML extension](https://docs.microsoft.com/en-us/azure/machine-learning/how-to-configure-cli) by running `az extension add -n azure-cli-ml`
+- [\[Optional\] Install Azure CLI ML extension](https://docs.microsoft.com/en-us/azure/machine-learning/how-to-configure-cli) by running `az extension add -n azure-cli-ml`
 
-### Section 2. Terraform
+### Terraform
 
 [Install Terraform](https://learn.hashicorp.com/tutorials/terraform/install-cli#install-terraform)
 
@@ -38,16 +37,12 @@ az extension add --name log-analytics
 
 ### Azure Monitor Powershell
 
+\[Optional\] If you want to call Azure Monitor from Powershell you can install the `Az.Monitor` Cmdlet.
+
 ```bash
 # In Powershell (type pwsh)
 Install-Module Az.Monitor
 ```
-
-### Section 6. CLI Utils
-
-- [Install jq](https://stedolan.github.io/jq/download/)
-  - WSL: `sudo apt-get install jq`
-  - OSX: `brew install jq`
 
 ## Instructions
 
@@ -138,7 +133,7 @@ I've seen the Log Analytics workspace deployed to a separate subscription which 
 
 - [Azure Monitor Agent](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/azure-monitor-agent-overview)
 - [DCR Reference](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/data-collection-rule-overview#create-a-dcr)
-- [az monitor-control-service][https://github.com/Azure/azure-cli-extensions/blob/main/src/monitor-control-service/README.md]
+- [az monitor-control-service](https://github.com/Azure/azure-cli-extensions/blob/main/src/monitor-control-service/README.md)
 - [DCR json reference](https://docs.microsoft.com/en-us/rest/api/monitor/data-collection-rules/create#examples)
 - [*-AzDataCollection* Command Reference](https://github.com/Azure/azure-powershell/tree/main/src/Monitor/Monitor/help)
 - [Terraform Azure Github Examples](https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples)
