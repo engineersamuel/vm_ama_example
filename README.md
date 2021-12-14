@@ -3,13 +3,16 @@
 - [Introduction](#introduction)
   - [Prerequisites](#prerequisites)
     - [Azure CLI](#azure-cli)
+    - [Powershell](#powershell)
     - [Terraform](#terraform)
     - [Azure CLI Extensions](#azure-cli-extensions)
-    - [Azure Monitor Powershell](#azure-monitor-powershell)
+    - [Powershell Cmdlets](#powershell-cmdlets)
   - [Instructions](#instructions)
-    - [Terraform](#terraform-1)
-    - [SSH to VM](#ssh-to-vm)
-    - [Stress test](#stress-test)
+    - [Deploy via Terraform](#deploy-via-terraform)
+    - [SSH to Linux VM](#ssh-to-linux-vm)
+    - [RDP to Windows VM](#rdp-to-windows-vm)
+    - [Linux Stress test](#linux-stress-test)
+    - [Windows Stress test](#windows-stress-test)
     - [View the CPU Spike](#view-the-cpu-spike)
     - [Useful Commands](#useful-commands)
   - [Unknowns](#unknowns)
@@ -22,7 +25,12 @@ If on Windows 10 it's recommended to use WSL2 + Ubuntu.
 ### Azure CLI
 
 - [Install Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
-- [\[Optional\] Install Azure CLI ML extension](https://docs.microsoft.com/en-us/azure/machine-learning/how-to-configure-cli) by running `az extension add -n azure-cli-ml`
+
+### Powershell
+
+This should only be required if you are on a Mac or on LInux.
+
+- [Install Powershell on Mac](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-macos?view=powershell-7.2)
 
 ### Terraform
 
@@ -35,18 +43,29 @@ az extension add --name monitor-control-service
 az extension add --name log-analytics
 ```
 
-### Azure Monitor Powershell
+### Powershell Cmdlets
 
-\[Optional\] If you want to call Azure Monitor from Powershell you can install the `Az.Monitor` Cmdlet.
+\[Optional\] If you want to call Azure Monitor/Compute from Powershell install the following:
 
 ```bash
-# In Powershell (type pwsh)
+# In Powershell (type pwsh on mac)
 Install-Module Az.Monitor
+Install-Module Az.Compute
 ```
 
 ## Instructions
 
-### Terraform
+### Deploy via Terraform
+
+Edit/create the `deployment/dev.tfvars` with:
+
+```text
+windows_vm_count = 2
+linux_vm_count = 2
+windows_admin_password = "REPLACE_ME"
+
+The above will naturally create two Windows and two Linux VMs.
+```
 
 ```text
 cd deployment
@@ -56,11 +75,11 @@ terraform plan --var-file dev.tfvars
 terraform apply --auto-approve --var-file dev.tfvars
 ```
 
-Once applied terraform will output three commands, see the [deployment/output.tf](deployment/outputs.tf) for reference.  Copy and paste each of these commands to the terminal.
+Once applied terraform will output commands for logging into the VMs, see the [deployment/output.tf](deployment/outputs.tf) for reference.
 
-Note that the [deployment/variables.tf](deployment/variables.tf) contains defaults for each required variable.  You still need a [deployment/dev.tfvars](./deployment/dev.tfvars) however it can be empty unless you want to override the defaults.
+Note that the [deployment/variables.tf](deployment/variables.tf) contains defaults for each required variable except the Windows admin password.
 
-### SSH to VM
+### SSH to Linux VM
 
 ```bash
 # Replace vmIp with the public IP of the VM
@@ -69,11 +88,23 @@ ssh -i ~/.ssh/id_rsa adminuser@vmIp
 
 Note: The above ssh command is output as part of terraform output so you can copy and paste from your terminal.  Alternatively to get the ip of the VM use: `az vm list-ip-addresses --name vmName --resource-group ama_test --out table`.
 
-### Stress test
+### RDP to Windows VM
+
+The output will contain Powershell commands to RDP into each windows VM, if you lost the output buffer just type `tf output`.
+
+Note that the Powershell command will only work in Windows, not linux or mac.  For mac you'll need to download the `rdp` file form the Azure Portal for the VM itself.
+
+### Linux Stress test
+
+For each Linux VM you can ssh in and type:
 
 ```bash
 stress --cpu 2 --timeout 60
 ```
+
+### Windows Stress test
+
+There are no good reputable packages for CPU stress testing from the command line that can be automated with Terraform.  The best recommendation here is to RDP into the Windows VMs, download and install [CpuStres](https://docs.microsoft.com/en-us/sysinternals/downloads/cpustres) and execute a stress test manually.
 
 ### View the CPU Spike
 
@@ -88,9 +119,24 @@ You should see something like:
 ```text
 [
   {
-    "Computer": "samuel-linux-1",
+    "Computer": "linux-vm-0",
     "TableName": "PrimaryResult",
     "count_": "57"
+  },
+  {
+    "Computer": "linux-vm-1",
+    "TableName": "PrimaryResult",
+    "count_": "58"
+  },
+  {
+    "Computer": "windows-vm-1",
+    "TableName": "PrimaryResult",
+    "count_": "59"
+  },
+  {
+    "Computer": "windows-vm-0",
+    "TableName": "PrimaryResult",
+    "count_": "59"
   }
 ]
 ```
@@ -98,12 +144,25 @@ You should see something like:
 Now let's look at the CPU spike we produced earlier.
 
 ```bash
-az monitor log-analytics query -w "$(az monitor log-analytics workspace list -g ama_test | jq -r '.[0].customerId')" --analytics-query " Perf | where CounterName == \"% Processor Time\" | where ObjectName == \"Processor\" | summarize avg(CounterValue) by bin(TimeGenerated, 5min), Computer, _ResourceId | render timechart"
+az monitor log-analytics query -w "$(az monitor log-analytics workspace list -g ama_test | jq -r '.[0].customerId')" --analytics-query "Perf | where TimeGenerated > ago(1h) | where CounterName == \"% Processor Time\" | where ObjectName == \"Processor\" | summarize sum(CounterValue) by bin(TimeGenerated, 1min), Computer, _ResourceId | render timechart"
 ```
 
-This will return quite a bit of data, so it's generally recommended to run this in the Azure Portal in the Log Analytics Workspace.  When doing that you'll see:
+This will return quite a bit of data, so it's generally recommended to run this in the Azure Portal in the Log Analytics Workspace.  Open up the Log Analytics workspace -> Logs, and C&P in:
+
+```text
+Perf
+| where TimeGenerated > ago(1h)
+| where CounterName == "% Processor Time"
+| where ObjectName == "Processor"
+| summarize sum(CounterValue) by bin(TimeGenerated, 1min), Computer, _ResourceId
+| render timechart
+```
+
+When doing that you'll see:
 
 ![cpu_spike](./images/cpu_spike.png)
+
+You can see in the above query I spiked the cpu independenly on the `linux-vm-0` and on the `linux-vm-1` after that.
 
 ### Useful Commands
 
@@ -120,14 +179,12 @@ az vm extension image list --location eastus2 -o table | grep AzureMonitorLinuxA
 
 ## Unknowns
 
-In the [templates/dcr.test.json](./templates/dcr.test.json) an error is thrown "Operation returned an invalid status code 'BadRequest'" if I include the following in the `performanceCOunters.streams`:
+In the [templates/dcr.test.json](./templates/dcr.test.json) an error is thrown "Operation returned an invalid status code 'BadRequest'" if I include the following in the `performanceCounters.streams`:
 
 ```text
   "Microsoft-Syslog",
   "Microsoft-Event",
 ```
-
-I've seen the Log Analytics workspace deployed to a separate subscription which causes the `az monitor` commands to fail when looking up the workspace.  This may be due to me running in an enterprise sub and not a pay-as-you-go which may be with LA requires.
 
 ### References
 
@@ -139,3 +196,4 @@ I've seen the Log Analytics workspace deployed to a separate subscription which 
 - [Terraform Azure Github Examples](https://github.com/hashicorp/terraform-provider-azurerm/tree/main/examples)
 - [az monitor log-analytics](https://docs.microsoft.com/en-us/cli/azure/monitor/log-analytics?view=azure-cli-latest)
 - [Performance Counters reference](https://docs.microsoft.com/en-us/azure/azure-monitor/agents/data-sources-performance-counters)
+- [Az Rest DCR Example](https://github.com/claranet/terraform-azurerm-linux-vm/blob/master/r-diagnostics.tf)
